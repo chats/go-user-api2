@@ -1,0 +1,50 @@
+# Binary
+go-video-api
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+
+# Log files
+*.log
+
+# Test binaries
+*.test
+*.prof
+
+# Output of the go coverage tool
+*.out
+*.cover
+
+# Dependency directories (remove the comment below to include it)
+# vendor/
+
+# IDE files
+.idea/
+.vscode/
+*.iml
+*.iws
+.DS_Store
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Go workspace
+go.work
+go.work.sum
+
+# Development 
+tmp/
+.air.toml
+
+logs/*

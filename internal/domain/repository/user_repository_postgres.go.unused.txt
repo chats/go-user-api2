@@ -1,0 +1,220 @@
+package repository
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	"github.com/chats/go-user-api/internal/domain/entity"
+	"github.com/google/uuid"
+	"github.com/jackc/pgx"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/rs/zerolog/log"
+)
+
+// createUserPostgres creates a user in PostgreSQL
+func (r *userRepository) createUserPostgres(ctx context.Context, pool *pgxpool.Pool, user *entity.User) error {
+	query := `
+		INSERT INTO users (id, email, username, password, first_name, last_name, role, status, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+	`
+	_, err := pool.Exec(ctx, query,
+		user.ID, user.Email, user.Username, user.Password, user.FirstName, user.LastName,
+		user.Role, user.Status, user.CreatedAt, user.UpdatedAt,
+	)
+	if err != nil {
+		log.Error().Err(err).Str("user_id", user.ID.String()).Msg("Failed to create user in PostgreSQL")
+		return fmt.Errorf("failed to create user: %w", err)
+	}
+	return nil
+}
+
+// getUserByIDPostgres gets a user by ID from PostgreSQL
+func (r *userRepository) getUserByIDPostgres(ctx context.Context, pool *pgxpool.Pool, id uuid.UUID) (*entity.User, error) {
+	query := `
+		SELECT id, email, username, password, first_name, last_name, role, status, created_at, updated_at
+		FROM users
+		WHERE id = $1
+	`
+
+	var user entity.User
+	err := pool.QueryRow(ctx, query, id).Scan(
+		&user.ID, &user.Email, &user.Username, &user.Password, &user.FirstName, &user.LastName,
+		&user.Role, &user.Status, &user.CreatedAt, &user.UpdatedAt,
+	)
+
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, nil // User not found
+		}
+		log.Error().Err(err).Str("user_id", id.String()).Msg("Failed to get user from PostgreSQL")
+		return nil, fmt.Errorf("failed to get user: %w", err)
+	}
+
+	return &user, nil
+}
+
+// getUserByEmailPostgres gets a user by email from PostgreSQL
+func (r *userRepository) getUserByEmailPostgres(ctx context.Context, pool *pgxpool.Pool, email string) (*entity.User, error) {
+	query := `
+		SELECT id, email, username, password, first_name, last_name, role, status, created_at, updated_at
+		FROM users
+		WHERE email = $1
+	`
+
+	var user entity.User
+	err := pool.QueryRow(ctx, query, email).Scan(
+		&user.ID, &user.Email, &user.Username, &user.Password, &user.FirstName, &user.LastName,
+		&user.Role, &user.Status, &user.CreatedAt, &user.UpdatedAt,
+	)
+
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, nil // User not found
+		}
+		log.Error().Err(err).Str("email", email).Msg("Failed to get user by email from PostgreSQL")
+		return nil, fmt.Errorf("failed to get user by email: %w", err)
+	}
+
+	return &user, nil
+}
+
+// getUserByUsernamePostgres gets a user by username from PostgreSQL
+func (r *userRepository) getUserByUsernamePostgres(ctx context.Context, pool *pgxpool.Pool, username string) (*entity.User, error) {
+	query := `
+		SELECT id, email, username, password, first_name, last_name, role, status, created_at, updated_at
+		FROM users
+		WHERE username = $1
+	`
+
+	var user entity.User
+	err := pool.QueryRow(ctx, query, username).Scan(
+		&user.ID, &user.Email, &user.Username, &user.Password, &user.FirstName, &user.LastName,
+		&user.Role, &user.Status, &user.CreatedAt, &user.UpdatedAt,
+	)
+
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, nil // User not found
+		}
+		log.Error().Err(err).Str("username", username).Msg("Failed to get user by username from PostgreSQL")
+		return nil, fmt.Errorf("failed to get user by username: %w", err)
+	}
+
+	return &user, nil
+}
+
+// updateUserPostgres updates a user in PostgreSQL
+func (r *userRepository) updateUserPostgres(ctx context.Context, pool *pgxpool.Pool, user *entity.User) error {
+	query := `
+		UPDATE users
+		SET email = $1, username = $2, first_name = $3, last_name = $4, 
+		    role = $5, status = $6, updated_at = $7
+		WHERE id = $8
+	`
+
+	_, err := pool.Exec(ctx, query,
+		user.Email, user.Username, user.FirstName, user.LastName,
+		user.Role, user.Status, user.UpdatedAt, user.ID,
+	)
+
+	if err != nil {
+		log.Error().Err(err).Str("user_id", user.ID.String()).Msg("Failed to update user in PostgreSQL")
+		return fmt.Errorf("failed to update user: %w", err)
+	}
+
+	return nil
+}
+
+// deleteUserPostgres deletes a user from PostgreSQL
+func (r *userRepository) deleteUserPostgres(ctx context.Context, pool *pgxpool.Pool, id uuid.UUID) error {
+	query := "DELETE FROM users WHERE id = $1"
+
+	_, err := pool.Exec(ctx, query, id)
+	if err != nil {
+		log.Error().Err(err).Str("user_id", id.String()).Msg("Failed to delete user from PostgreSQL")
+		return fmt.Errorf("failed to delete user: %w", err)
+	}
+
+	return nil
+}
+
+// listUsersPostgres lists users from PostgreSQL
+func (r *userRepository) listUsersPostgres(ctx context.Context, pool *pgxpool.Pool, limit, offset int) ([]*entity.User, int64, error) {
+	// Get total count
+	var total int64
+	countErr := pool.QueryRow(ctx, "SELECT COUNT(*) FROM users").Scan(&total)
+	if countErr != nil {
+		log.Error().Err(countErr).Msg("Failed to count users in PostgreSQL")
+		return nil, 0, fmt.Errorf("failed to count users: %w", countErr)
+	}
+
+	// Get users
+	query := `
+		SELECT id, email, username, password, first_name, last_name, role, status, created_at, updated_at
+		FROM users
+		ORDER BY created_at DESC
+		LIMIT $1 OFFSET $2
+	`
+
+	rows, err := pool.Query(ctx, query, limit, offset)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to list users from PostgreSQL")
+		return nil, 0, fmt.Errorf("failed to list users: %w", err)
+	}
+	defer rows.Close()
+
+	var users []*entity.User
+	for rows.Next() {
+		var user entity.User
+		if err := rows.Scan(
+			&user.ID, &user.Email, &user.Username, &user.Password, &user.FirstName, &user.LastName,
+			&user.Role, &user.Status, &user.CreatedAt, &user.UpdatedAt,
+		); err != nil {
+			log.Error().Err(err).Msg("Failed to scan user row from PostgreSQL")
+			return nil, 0, fmt.Errorf("failed to scan user row: %w", err)
+		}
+		users = append(users, &user)
+	}
+
+	if err := rows.Err(); err != nil {
+		log.Error().Err(err).Msg("Error during row iteration from PostgreSQL")
+		return nil, 0, fmt.Errorf("error during row iteration: %w", err)
+	}
+
+	return users, total, nil
+}
+
+// changePasswordPostgres changes a user's password in PostgreSQL
+func (r *userRepository) changePasswordPostgres(ctx context.Context, pool *pgxpool.Pool, id uuid.UUID, hashedPassword string) error {
+	query := `
+		UPDATE users
+		SET password = $1, updated_at = $2
+		WHERE id = $3
+	`
+
+	_, err := pool.Exec(ctx, query, hashedPassword, time.Now(), id)
+	if err != nil {
+		log.Error().Err(err).Str("user_id", id.String()).Msg("Failed to change password in PostgreSQL")
+		return fmt.Errorf("failed to change password: %w", err)
+	}
+
+	return nil
+}
+
+// updateStatusPostgres updates a user's status in PostgreSQL
+func (r *userRepository) updateStatusPostgres(ctx context.Context, pool *pgxpool.Pool, id uuid.UUID, status string) error {
+	query := `
+		UPDATE users
+		SET status = $1, updated_at = $2
+		WHERE id = $3
+	`
+
+	_, err := pool.Exec(ctx, query, status, time.Now(), id)
+	if err != nil {
+		log.Error().Err(err).Str("user_id", id.String()).Msg("Failed to update status in PostgreSQL")
+		return fmt.Errorf("failed to update status: %w", err)
+	}
+
+	return nil
+}

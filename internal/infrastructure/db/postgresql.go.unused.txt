@@ -1,0 +1,116 @@
+package db
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	"github.com/chats/go-user-api/config"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/rs/zerolog/log"
+)
+
+// PostgresDB implements the Database interface for PostgreSQL
+type PostgresDB struct {
+	config config.DatabaseConfig
+	pool   *pgxpool.Pool
+}
+
+// NewPostgreSQL creates a new PostgreSQL database connection
+func NewPostgreSQL(config config.DatabaseConfig) (Database, error) {
+	return &PostgresDB{
+		config: config,
+	}, nil
+}
+
+// Connect establishes a connection to PostgreSQL
+func (db *PostgresDB) Connect(ctx context.Context) error {
+	dsn := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=%s",
+		db.config.Username,
+		db.config.Password,
+		db.config.Host,
+		db.config.Port,
+		db.config.Database,
+		db.config.SSLMode,
+	)
+
+	config, err := pgxpool.ParseConfig(dsn)
+	if err != nil {
+		return fmt.Errorf("unable to parse PostgreSQL connection string: %v", err)
+	}
+
+	// Set connection pool configuration
+	config.MaxConns = 20
+	config.MinConns = 5
+	config.MaxConnLifetime = time.Hour
+	config.MaxConnIdleTime = 30 * time.Minute
+	config.HealthCheckPeriod = time.Minute
+
+	// Create a connection pool
+	pool, err := pgxpool.NewWithConfig(ctx, config)
+	if err != nil {
+		return fmt.Errorf("unable to create PostgreSQL connection pool: %v", err)
+	}
+
+	// Test the connection
+	if err := pool.Ping(ctx); err != nil {
+		return fmt.Errorf("unable to ping PostgreSQL database: %v", err)
+	}
+
+	db.pool = pool
+	log.Info().Msg("Connected to PostgreSQL successfully")
+	return nil
+}
+
+// Close closes the PostgreSQL connection
+func (db *PostgresDB) Close(ctx context.Context) error {
+	if db.pool != nil {
+		log.Info().Msg("Closing PostgreSQL connection pool")
+		db.pool.Close()
+	}
+	return nil
+}
+
+// Ping verifies the connection to PostgreSQL
+func (db *PostgresDB) Ping(ctx context.Context) error {
+	if db.pool == nil {
+		return fmt.Errorf("PostgreSQL connection pool not initialized")
+	}
+	return db.pool.Ping(ctx)
+}
+
+// GetInstance returns the PostgreSQL connection pool instance
+func (db *PostgresDB) GetInstance() interface{} {
+	return db.pool
+}
+
+// GetPool returns the connection pool typed as pgxpool.Pool
+func (db *PostgresDB) GetPool() *pgxpool.Pool {
+	return db.pool
+}
+
+// ExecuteInTransaction executes a function within a transaction
+func (db *PostgresDB) ExecuteInTransaction(ctx context.Context, fn func(pgx.Tx) error) error {
+	tx, err := db.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("unable to begin transaction: %v", err)
+	}
+
+	// Execute the function
+	if err := fn(tx); err != nil {
+		// Rollback on error
+		rollbackErr := tx.Rollback(ctx)
+		if rollbackErr != nil {
+			log.Error().Err(rollbackErr).Msg("Failed to rollback transaction")
+		}
+		return err
+	}
+
+	// Commit if successful
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("failed to commit transaction: %v", err)
+	}
+
+	return nil
+}

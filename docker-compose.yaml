@@ -1,0 +1,146 @@
+#version: '3.8'
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    #container_name: go-user-api
+    restart: unless-stopped
+    ports:
+      - "8080:8080"  # HTTP
+      - "50051:50051"  # gRPC
+    environment:
+      - APP_ENV=development
+      - APP_DEBUG=true
+      - DB_HOST=mongo
+      - DB_PORT=27017
+      - DB_USERNAME=mongo
+      - DB_PASSWORD=mongo
+      - DB_DATABASE=user_service
+      - DB_TYPE=mongodb
+      - CACHE_HOST=redis
+      - CACHE_PORT=6379
+      - CACHE_TYPE=redis
+      #- JAEGER_HOST=jaeger
+      #- JAEGER_PORT=14268
+      #- JAEGER_ENABLED=true
+    depends_on:
+      #- postgres
+      - mongodb
+      - redis
+      #- jaeger
+    networks:
+      - user-api-network
+    volumes:
+      - ./:/app
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  #postgres:
+  #  image: postgres:15-alpine
+  #  restart: unless-stopped
+  #  environment:
+  #    - POSTGRES_USER=postgres
+  #    - POSTGRES_PASSWORD=postgres
+  #    - POSTGRES_DB=user_service
+  #  ports:
+  #    - "5432:5432"
+  #  volumes:
+  #    - postgres-data:/var/lib/postgresql/data
+  #    - ./scripts/postgres-init.sql:/docker-entrypoint-initdb.d/init.sql
+  #  networks:
+  #    - user-api-network
+  #  healthcheck:
+  #    test: ["CMD-SHELL", "pg_isready -U postgres"]
+  #    interval: 10s
+  #    timeout: 5s
+  #    retries: 3
+  #    start_period: 10s
+
+  redis:
+    image: redis:7-alpine
+    #container_name: go-user-api-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - user-api-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  mongodb:
+    image: mongo:8
+    #container_name: go-user-api-mongodb
+    restart: unless-stopped
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=mongo
+      - MONGO_INITDB_ROOT_PASSWORD=mongo
+      - MONGO_INITDB_DATABASE=user_service
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+      - ./scripts/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    networks:
+      - user-api-network
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  #memcached:
+  #  image: memcached:1.6-alpine
+  #  container_name: go-user-api-memcached
+  #  restart: unless-stopped
+  #  ports:
+  #    - "11211:11211"
+  #  networks:
+  #    - user-api-network
+
+  #jaeger:
+  #  image: jaegertracing/all-in-one:latest
+  #  #container_name: go-user-api-jaeger
+  #  restart: unless-stopped
+  #  ports:
+  #    - "16686:16686"  # UI
+  #    - "14268:14268"  # Collector HTTP
+  #    - "14250:14250"  # Collector gRPC
+  #    - "6831:6831/udp"  # Agent
+  #  environment:
+  #    - COLLECTOR_ZIPKIN_HOST_PORT=:9411
+  #  networks:
+  #    - user-api-network
+  #
+  #adminer:
+  #  image: adminer:latest
+  #  container_name: go-user-api-adminer
+  #  restart: unless-stopped
+  #  ports:
+  #    - "8081:8080"
+  #  depends_on:
+  #    - postgres
+  #    - mongodb
+  #  networks:
+  #    - user-api-network
+
+networks:
+  user-api-network:
+    driver: bridge
+
+volumes:
+  #postgres-data:
+  redis-data:
+  mongo-data:

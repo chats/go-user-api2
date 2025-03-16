@@ -1,0 +1,116 @@
+package cache
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	"github.com/bradfitz/gomemcache/memcache"
+	"github.com/chats/go-user-api/config"
+	"github.com/rs/zerolog/log"
+)
+
+// MemcachedCache implements the Cache interface for Memcached
+type MemcachedCache struct {
+	config config.CacheConfig
+	client *memcache.Client
+}
+
+// NewMemcached creates a new Memcached cache connection
+func NewMemcached(config config.CacheConfig) (Cache, error) {
+	return &MemcachedCache{
+		config: config,
+	}, nil
+}
+
+// Connect establishes a connection to Memcached
+func (c *MemcachedCache) Connect(ctx context.Context) error {
+	serverAddr := fmt.Sprintf("%s:%d", c.config.Host, c.config.Port)
+	client := memcache.New(serverAddr)
+
+	// Configure client
+	client.Timeout = 5 * time.Second
+	client.MaxIdleConns = 50
+
+	// Test the connection
+	if err := client.Ping(); err != nil {
+		return fmt.Errorf("failed to connect to Memcached: %v", err)
+	}
+
+	c.client = client
+	log.Info().Msg("Connected to Memcached successfully")
+	return nil
+}
+
+// Close closes the Memcached connection
+func (c *MemcachedCache) Close() error {
+	// Memcache client doesn't have a Close method, but we implement it for the interface
+	log.Info().Msg("Closing Memcached connection")
+	return nil
+}
+
+// Ping verifies the connection to Memcached
+func (c *MemcachedCache) Ping(ctx context.Context) error {
+	if c.client == nil {
+		return fmt.Errorf("Memcached client not initialized")
+	}
+	return c.client.Ping()
+}
+
+// Get retrieves a value from Memcached
+func (c *MemcachedCache) Get(ctx context.Context, key string) ([]byte, error) {
+	item, err := c.client.Get(key)
+	if err == memcache.ErrCacheMiss {
+		return nil, nil // Key not found, return nil without error
+	}
+	if err != nil {
+		return nil, err
+	}
+	return item.Value, nil
+}
+
+// Set stores a value in Memcached
+func (c *MemcachedCache) Set(ctx context.Context, key string, value []byte, expiration time.Duration) error {
+	return c.client.Set(&memcache.Item{
+		Key:        key,
+		Value:      value,
+		Expiration: int32(expiration.Seconds()),
+	})
+}
+
+// Delete removes a key from Memcached
+func (c *MemcachedCache) Delete(ctx context.Context, key string) error {
+	err := c.client.Delete(key)
+	if err == memcache.ErrCacheMiss {
+		return nil // Key not found is not an error
+	}
+	return err
+}
+
+// Clear clears all keys in Memcached
+// Note: Memcached doesn't have a "flush all" command in the client library
+func (c *MemcachedCache) Clear(ctx context.Context) error {
+	// We would need server access or use a workaround
+	// This is a limitation of the client library
+	return fmt.Errorf("clear all not supported for Memcached client")
+}
+
+// GetMulti retrieves multiple values from Memcached
+func (c *MemcachedCache) GetMulti(ctx context.Context, keys []string) (map[string][]byte, error) {
+	items, err := c.client.GetMulti(keys)
+	if err != nil {
+		return nil, err
+	}
+
+	results := make(map[string][]byte)
+	for key, item := range items {
+		results[key] = item.Value
+	}
+
+	return results, nil
+}
+
+// GetInstance returns the Memcached client instance
+func (c *MemcachedCache) GetInstance() interface{} {
+	return c.client
+}
