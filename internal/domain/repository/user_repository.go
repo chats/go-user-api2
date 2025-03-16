@@ -101,7 +101,8 @@ func (r *userRepository) GetByID(ctx context.Context, id uuid.UUID) (*entity.Use
 	}
 
 	if dbErr != nil {
-		return nil, dbErr
+		//return nil, dbErr
+		return nil, fmt.Errorf("repository.GetByID: %w", dbErr)
 	}
 
 	// If user found, cache it

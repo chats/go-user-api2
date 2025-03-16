@@ -9,9 +9,11 @@ import (
 	"time"
 
 	"github.com/chats/go-user-api/api/http/handler"
+	"github.com/chats/go-user-api/api/http/middleware"
 	"github.com/chats/go-user-api/api/http/router"
 	"github.com/chats/go-user-api/config"
 	"github.com/chats/go-user-api/internal/domain/repository"
+	"github.com/chats/go-user-api/internal/domain/service"
 	"github.com/chats/go-user-api/internal/domain/usecase"
 	"github.com/chats/go-user-api/internal/infrastructure/cache"
 	"github.com/chats/go-user-api/internal/infrastructure/db"
@@ -69,39 +71,26 @@ func (s *Server) Setup() error {
 
 	// Set up repositories
 	userRepo := repository.NewUserRepository(s.database, s.cacheClient)
+	tokenRepo := repository.NewTokenRepository(s.cacheClient)
+
+	tokenService, err := service.NewTokenService(s.config.Security)
+	if err != nil {
+		return fmt.Errorf("failed to create token service")
+	}
 
 	// Set up use cases
 	userUseCase := usecase.NewUserUseCase(userRepo)
+	authUseCase := usecase.NewAuthUseCase(userRepo, tokenRepo, tokenService)
 
 	// Set up HTTP handlers
 	userHandler := handler.NewUserHandler(userUseCase)
+	authHandler := handler.NewAuthHandler(authUseCase)
 
-	// Set up gRPC server
-	/*
-		grpcServer, err := grpc.NewServer(grpc.Config{
-			Port:             s.config.GRPC.Port,
-			UseTLS:           s.config.GRPC.UseTLS,
-			CertFile:         s.config.GRPC.CertFile,
-			KeyFile:          s.config.GRPC.KeyFile,
-			MaxRecvMsgSize:   s.config.GRPC.MaxRecvMsgSize,
-			MaxSendMsgSize:   s.config.GRPC.MaxSendMsgSize,
-			EnableReflection: s.config.GRPC.EnableReflection,
-		})
-
-		if err != nil {
-			return fmt.Errorf("failed to create gRPC server: %v", err)
-		}
-
-		// Register gRPC service
-		userService := grpcService.NewUserService(userUseCase)
-		grpcServer.RegisterUserService(userService.(proto.UserServiceServer))
-		s.grpcServer = grpcServer
-	*/
+	// Create auth middleware
+	authMiddleware := middleware.AuthMiddleware(authUseCase)
 
 	// Set up HTTP server
-	//routes.SetupRoutes(app, cfg, authHandler, userHandler, roleHandler, permissionHandler, authService)
-
-	httpServer := router.Setup(s.config, userHandler)
+	httpServer := router.Setup(s.config, userHandler, authHandler, authMiddleware)
 	s.httpServer = httpServer
 
 	return nil

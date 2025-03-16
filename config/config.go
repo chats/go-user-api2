@@ -96,6 +96,14 @@ type SecurityConfig struct {
 	JWTSecret          string
 	JWTExpirationHours int
 	BcryptCost         int
+
+	// PASETO related fields
+	PasetoPrivateKey string
+	PasetoPublicKey  string
+
+	// Token expiration settings
+	AccessTokenExpirationMinutes int
+	RefreshTokenExpirationDays   int
 }
 
 type MiddlewareConfig struct {

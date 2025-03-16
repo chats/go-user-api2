@@ -124,9 +124,13 @@ func LoadConfig() *Config {
 			Enabled:     getEnvAsBool("JAEGER_ENABLED", true),
 		},
 		Security: SecurityConfig{
-			JWTSecret:          getEnv("JWT_SECRET", "your-secret-key"),
-			JWTExpirationHours: getEnvAsInt("JWT_EXPIRATION_HOURS", 24),
-			BcryptCost:         getEnvAsInt("BCRYPT_COST", 12),
+			JWTSecret:                    getEnv("JWT_SECRET", "your-secret-key"),
+			JWTExpirationHours:           getEnvAsInt("JWT_EXPIRATION_HOURS", 24),
+			BcryptCost:                   getEnvAsInt("BCRYPT_COST", 12),
+			PasetoPrivateKey:             getEnv("PASETO_PRIVATE_KEY", ""),
+			PasetoPublicKey:              getEnv("PASETO_PUBLIC_KEY", ""),
+			AccessTokenExpirationMinutes: getEnvAsInt("ACCESS_TOKEN_EXPIRATION_MINUTES", 15),
+			RefreshTokenExpirationDays:   getEnvAsInt("REFRESH_TOKEN_EXPIRATION_DAYS", 7),
 		},
 		Middleware: MiddlewareConfig{
 			EnableTracing:     getEnvAsBool("MIDDLEWARE_TRACING", false),

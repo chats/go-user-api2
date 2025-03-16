@@ -18,7 +18,12 @@ import (
 )
 
 // Setup sets up the fiber router with middleware and routes
-func Setup(cfg *config.Config, userHandler *handler.UserHandler) *fiber.App {
+func Setup(
+	cfg *config.Config,
+	userHandler *handler.UserHandler,
+	authHandler *handler.AuthHandler,
+	authMiddleware fiber.Handler,
+) *fiber.App {
 	// Create new Fiber app
 	app := fiber.New(fiber.Config{
 		ReadTimeout:  cfg.HTTP.ReadTimeout,
@@ -97,8 +102,9 @@ func Setup(cfg *config.Config, userHandler *handler.UserHandler) *fiber.App {
 	// Register health check route
 	api.Get("/health", userHandler.HealthCheck)
 
-	// Register user routes
-	userHandler.RegisterRoutes(v1)
+	// Register user/auth routes
+	userHandler.RegisterRoutes(v1, authMiddleware)
+	authHandler.RegisterRoutes(v1, authMiddleware)
 
 	// 404 Handler
 	app.Use(func(c *fiber.Ctx) error {

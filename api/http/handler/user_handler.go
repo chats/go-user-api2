@@ -23,21 +23,21 @@ func NewUserHandler(userUseCase usecase.UserUseCase) *UserHandler {
 }
 
 // RegisterRoutes registers the routes for the user handler
-func (h *UserHandler) RegisterRoutes(router fiber.Router) {
+func (h *UserHandler) RegisterRoutes(router fiber.Router, authMiddleware fiber.Handler) {
 	userGroup := router.Group("/users")
 
 	// Routes that don't require authentication
 	userGroup.Post("/register", h.Register)
-	userGroup.Post("/login", h.Login)
+	//userGroup.Post("/login", h.Login) // login moved to auth group.
 
 	// Routes that require authentication
 	// In a real application, these would be protected by middleware
-	userGroup.Get("/:id", h.GetByID)
-	userGroup.Put("/:id", h.Update)
-	userGroup.Delete("/:id", h.Delete)
-	userGroup.Get("/", h.List)
-	userGroup.Put("/:id/password", h.ChangePassword)
-	userGroup.Put("/:id/status", h.UpdateStatus)
+	userGroup.Get("/:id", authMiddleware, h.GetByID)
+	userGroup.Put("/:id", authMiddleware, h.Update)
+	userGroup.Delete("/:id", authMiddleware, h.Delete)
+	userGroup.Get("/", authMiddleware, h.List)
+	userGroup.Put("/:id/password", authMiddleware, h.ChangePassword)
+	userGroup.Put("/:id/status", authMiddleware, h.UpdateStatus)
 }
 
 // Register handles user registration
