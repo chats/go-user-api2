@@ -5,11 +5,10 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/chats/go-user-api/internal/utils"
-
 	"github.com/chats/go-user-api/internal/domain/entity"
 	"github.com/chats/go-user-api/internal/domain/repository"
 	"github.com/chats/go-user-api/internal/domain/service"
+	"github.com/chats/go-user-api/utils"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
 )

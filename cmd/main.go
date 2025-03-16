@@ -4,7 +4,7 @@ import (
 	"os"
 
 	"github.com/chats/go-user-api/config"
-	"github.com/chats/go-user-api/internal/logger"
+	"github.com/chats/go-user-api/pkg/logger"
 	"github.com/chats/go-user-api/server"
 	"github.com/rs/zerolog/log"
 )

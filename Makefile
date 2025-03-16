@@ -74,7 +74,9 @@ test-coverage: ## Run tests with coverage
 mock: ## Generate mocks
 	@echo "Generating mocks..."
 	$(GOMOCK) -source=./internal/domain/repository/user_repository.go -destination=./internal/domain/mocks/user_repository_mock.go -package=mocks UserRepository
+	$(GOMOCK) -source=./internal/domain/repository/token_repository.go -destination=./internal/domain/mocks/token_repository_mock.go -package=mocks TokenRepository
 	$(GOMOCK) -source=./internal/domain/usecase/user_usecase.go -destination=./internal/domain/mocks/user_usecase_mock.go -package=mocks UserUseCase
+	$(GOMOCK) -source=./internal/domain/usecase/auth_usecase.go -destination=./internal/domain/mocks/auth_usecase_mock.go -package=mocks AuthUseCase
 
 proto: ## Generate protobuf files
 	@echo "Generating protobuf files..."
